@@ -1,50 +1,47 @@
-# React + TypeScript + Vite
+# ドットキャラクターメーカー
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ブラウザ上でパーツを選ぶだけで、自分だけのドット絵ちびキャラクターを作れるジェネレーターです。
 
-Currently, two official plugins are available:
+🔗 **デモを見る**: https://koichi-menta.github.io/dot-character-maker/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## できること
 
-## Expanding the ESLint configuration
+- **頭身**：1.5頭身（ちび）／2.5頭身（スリム）から選べる
+- **パーツごとのカスタマイズ**：顔・目・口・髪・トップス・ボトムス・くつ、それぞれ複数の形からスタイルを選べる
+- **カラー選択**：肌・目・髪・トップス・ボトムス・くつの色を、用意されたカラーパレットまたはカスタムカラーピッカーから選べる
+- **🎲 ランダム生成**：ボタン一つで全パーツをランダムに組み合わせて、思いがけないキャラを発見できる
+- **⬇ PNG保存**：作ったキャラクターを `dot-character.png` として画像ファイルにダウンロードできる
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## 使い方
 
-- Configure the top-level `parserOptions` property like this:
+1. 画面右側のパネルから「頭身」を選ぶ
+2. 「顔」「目」「口」「髪」「トップス」「ボトムス」「くつ」の各セクションで、好きな形（ピル状のボタン）と色（カラースウォッチ）を選ぶ
+   - パレットにない色を使いたいときは、＋のカスタムカラーから自由に選択できる
+3. 左側のプレビュー画面にリアルタイムで反映されるので、見た目を確認しながら調整する
+4. 組み合わせに迷ったら「🎲 ランダム」ボタンで一気にランダム生成できる
+5. 気に入ったキャラクターができたら「⬇ PNG保存」ボタンで画像として保存する
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## ローカルでの動かし方
+
+```bash
+npm install
+npm run dev
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+`npm run dev` 実行後、表示されるURL（デフォルトは http://localhost:5173 ）にアクセスするとアプリが起動します。
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+### その他のコマンド
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
+```bash
+npm run build   # 本番用ビルド（distに出力）
+npm run preview # ビルド結果をローカルでプレビュー
+npm run lint    # ESLintによるコードチェック
 ```
+
+## 技術スタック
+
+- React + TypeScript
+- Vite（ビルドツール）
+- Canvas API を使って、パーツごとの座標計算でドット絵を描画
+
+master ブランチへの push で GitHub Actions が自動的に GitHub Pages へデプロイします（`.github/workflows/deploy-pages.yml`）。
