@@ -27,7 +27,7 @@ function faceClass(row: number, col: number, variant: number): 'base' | 'edge' |
   const dx = col - 11.5, dy = row - 11;
   let rx = 8, ry = 8;
   if (variant === 1) { rx = 6.8; ry = 9.6; }
-  else if (variant === 2) { rx = 9.6; ry = 7.4; }
+  else if (variant === 2) { rx = 9.6; ry = 7.65; }
   const r = Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry));
   if (r <= 0.9) return 'base';
   if (r <= 1.06) return 'edge';
@@ -107,24 +107,24 @@ function neckClassChibi(row: number, col: number): 'base' | null {
   return row === 20 ? 'base' : null;
 }
 
-function torsoClassChibi(row: number, col: number, variant: number): 'base' | 'edge' | null {
-  if (row < 21 || row > 25) return null;
+function torsoClassChibi(row: number, col: number, variant: number): 'base' | 'edge' | 'skin' | null {
+  if (row < 20 || row > 25) return null;
   const dx = col - 11.5;
   const halfWidth = row <= 22 ? 6.3 : 6.0;
   if (Math.abs(dx) > halfWidth) return null;
   if (variant === 2 && row === 23 && (col === 10 || col === 13)) return 'edge';
   let cutout = false;
   if (variant === 0) {
-    if (row === 21 && Math.abs(dx) <= 1.6) cutout = true;
+    if (row === 20 && Math.abs(dx) <= 1.6) cutout = true;
   } else if (variant === 1) {
-    const width = 1.8 - (row - 21) * 0.9;
-    if (row <= 22 && width > 0 && Math.abs(dx) <= width) cutout = true;
+    const width = 1.8 - (row - 20) * 0.9;
+    if (row <= 21 && width > 0 && Math.abs(dx) <= width) cutout = true;
   } else if (variant === 2) {
-    if (row === 21 && Math.abs(dx) <= 1) cutout = true;
+    if (row === 20 && Math.abs(dx) <= 1) cutout = true;
   } else if (variant === 3) {
-    if (row === 21) return 'edge';
+    if (row === 20) return 'edge';
   }
-  if (cutout) return null;
+  if (cutout) return 'skin';
   const edgeDist = halfWidth - Math.abs(dx);
   if (edgeDist < 1) return 'edge';
   return 'base';
@@ -174,8 +174,8 @@ function neckClassSlim(row: number, col: number): 'base' | 'edge' | null {
   return null;
 }
 
-function torsoClassSlim(row: number, col: number, variant: number): 'base' | 'edge' | null {
-  if (row < 22 || row > 33) return null;
+function torsoClassSlim(row: number, col: number, variant: number): 'base' | 'edge' | 'skin' | null {
+  if (row < 20 || row > 33) return null;
   const dx = col - 11.5;
   let halfWidth;
   if (row <= 24) halfWidth = 6.5;
@@ -185,18 +185,18 @@ function torsoClassSlim(row: number, col: number, variant: number): 'base' | 'ed
   if (variant === 2 && (row === 27 || row === 28) && (col === 10 || col === 13)) return 'edge';
   let cutout = false;
   if (variant === 0) {
-    const d = Math.hypot(dx, row - 22);
-    if (row <= 23 && d <= 2) cutout = true;
+    const d = Math.hypot(dx, row - 20);
+    if (row <= 21 && d <= 2) cutout = true;
   } else if (variant === 1) {
-    const width = 2.3 - (row - 22) * 0.8;
-    if (row <= 25 && width > 0 && Math.abs(dx) <= width) cutout = true;
+    const width = 2.3 - (row - 20) * 0.8;
+    if (row <= 23 && width > 0 && Math.abs(dx) <= width) cutout = true;
   } else if (variant === 2) {
-    const d = Math.hypot(dx, row - 22);
-    if (row <= 22 && d <= 1.3) cutout = true;
+    const d = Math.hypot(dx, row - 20);
+    if (row <= 20 && d <= 1.3) cutout = true;
   } else if (variant === 3) {
-    if (row <= 23) return 'edge';
+    if (row <= 21) return 'edge';
   }
-  if (cutout) return null;
+  if (cutout) return 'skin';
   const edgeDist = halfWidth - Math.abs(dx);
   if (edgeDist < 1) return 'edge';
   return 'base';
@@ -367,6 +367,7 @@ export default function DotCharacterGenerator() {
         const t = torsoFn(row, col, top);
         if (t === 'base') set(row, col, topColor);
         else if (t === 'edge') set(row, col, shade(topColor, -0.25));
+        else if (t === 'skin') set(row, col, skin);
       }
     }
     for (let row = 0; row < gridH; row++) {
