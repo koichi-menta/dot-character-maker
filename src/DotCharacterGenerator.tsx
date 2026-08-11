@@ -107,7 +107,7 @@ function neckClassChibi(row: number, col: number): 'base' | null {
   return row === 20 ? 'base' : null;
 }
 
-function torsoClassChibi(row: number, col: number, variant: number): 'base' | 'edge' | null {
+function torsoClassChibi(row: number, col: number, variant: number): 'base' | 'edge' | 'skin' | null {
   if (row < 20 || row > 25) return null;
   const dx = col - 11.5;
   const halfWidth = row <= 22 ? 6.3 : 6.0;
@@ -124,7 +124,7 @@ function torsoClassChibi(row: number, col: number, variant: number): 'base' | 'e
   } else if (variant === 3) {
     if (row === 20) return 'edge';
   }
-  if (cutout) return null;
+  if (cutout) return 'skin';
   const edgeDist = halfWidth - Math.abs(dx);
   if (edgeDist < 1) return 'edge';
   return 'base';
@@ -174,7 +174,7 @@ function neckClassSlim(row: number, col: number): 'base' | 'edge' | null {
   return null;
 }
 
-function torsoClassSlim(row: number, col: number, variant: number): 'base' | 'edge' | null {
+function torsoClassSlim(row: number, col: number, variant: number): 'base' | 'edge' | 'skin' | null {
   if (row < 20 || row > 33) return null;
   const dx = col - 11.5;
   let halfWidth;
@@ -196,7 +196,7 @@ function torsoClassSlim(row: number, col: number, variant: number): 'base' | 'ed
   } else if (variant === 3) {
     if (row <= 21) return 'edge';
   }
-  if (cutout) return null;
+  if (cutout) return 'skin';
   const edgeDist = halfWidth - Math.abs(dx);
   if (edgeDist < 1) return 'edge';
   return 'base';
@@ -367,6 +367,7 @@ export default function DotCharacterGenerator() {
         const t = torsoFn(row, col, top);
         if (t === 'base') set(row, col, topColor);
         else if (t === 'edge') set(row, col, shade(topColor, -0.25));
+        else if (t === 'skin') set(row, col, skin);
       }
     }
     for (let row = 0; row < gridH; row++) {
