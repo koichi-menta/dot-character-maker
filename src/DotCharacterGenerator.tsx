@@ -70,6 +70,71 @@ function mouthClass(row: number, col: number, variant: number): 'base' | null {
   return null;
 }
 
+/* ---------- expression(表情): eyes/mouth/eyebrows とは独立した感情軸 ---------- */
+/* expression === 0(通常)のときは既存の eyeClass/mouthClass(バリエーション選択)をそのまま使い、
+   1〜4 が選ばれているときだけ専用の形状で上書きする。 */
+
+function expressionEyeClass(row: number, col: number, expression: number): 'base' | 'highlight' | null {
+  switch (expression) {
+    case 1: // 注文中: まっすぐ開いた目
+      if (row === 12 && (col === 7 || col === 8 || col === 9)) return 'base';
+      if (row === 12 && (col === 14 || col === 15 || col === 16)) return 'base';
+      return null;
+    case 2: // 満足: にっこり閉じ目(上向きの弧)
+      if (row === 12 && (col === 7 || col === 9)) return 'base';
+      if (row === 11 && col === 8) return 'base';
+      if (row === 12 && (col === 14 || col === 16)) return 'base';
+      if (row === 11 && col === 15) return 'base';
+      return null;
+    case 3: // 困惑: 非対称の目(左は見開き、右は細目)
+      if (row === 11 && col === 8) return 'base';
+      if (row === 12 && (col === 7 || col === 8 || col === 9)) return 'base';
+      if (row === 13 && col === 8) return 'base';
+      if (row === 12 && col === 15) return 'base';
+      return null;
+    case 4: // 怒り: 睨みつける細目
+      if (row === 12 && (col === 7 || col === 8)) return 'base';
+      if (row === 13 && col === 9) return 'base';
+      if (row === 12 && (col === 15 || col === 16)) return 'base';
+      if (row === 13 && col === 14) return 'base';
+      return null;
+    default:
+      return null;
+  }
+}
+
+function expressionBrowClass(row: number, col: number, expression: number): 'base' | null {
+  if (expression !== 4) return null; // 怒り: 吊り眉
+  if (row === 10 && (col === 8 || col === 9)) return 'base';
+  if (row === 9 && (col === 6 || col === 7)) return 'base';
+  if (row === 10 && (col === 14 || col === 15)) return 'base';
+  if (row === 9 && (col === 16 || col === 17)) return 'base';
+  return null;
+}
+
+function expressionMouthClass(row: number, col: number, expression: number): 'base' | 'highlight' | null {
+  switch (expression) {
+    case 1: // 注文中: 小さめの開いた口
+      if (row === 17 && col === 11) return 'base';
+      if (row === 18 && col === 11) return 'base';
+      return null;
+    case 2: // 満足: 大きい笑顔
+      if (row === 17 && col >= 9 && col <= 13) return 'base';
+      if (row === 18 && col >= 10 && col <= 12) return 'highlight';
+      return null;
+    case 3: // 困惑: 傾いた口
+      if (row === 16 && col === 9) return 'base';
+      if (row === 17 && (col === 10 || col === 11)) return 'base';
+      if (row === 18 && (col === 12 || col === 13)) return 'base';
+      return null;
+    case 4: // 怒り: への字口(平らに結んだ口)
+      if (row === 17 && col >= 9 && col <= 13) return 'base';
+      return null;
+    default:
+      return null;
+  }
+}
+
 function hairClass(row: number, col: number, variant: number): 'base' | 'edge' | null {
   const dx = col - 11.5, dy = row - 11;
   const capR = Math.sqrt(dx * dx + dy * dy);
@@ -265,6 +330,8 @@ const HAIR_LABELS = ['ショート', 'ロング', 'ポニーテール', 'ボブ'
 const TOP_LABELS = ['まるえり', 'Vネック', 'パーカー', 'タートル'];
 const BOTTOM_LABELS = ['ロングパンツ', 'ショートパンツ', 'スカート'];
 const SHOE_LABELS = ['スニーカー', 'ブーツ'];
+const EXPRESSION_LABELS = ['通常', '注文中', '満足', '困惑', '怒り'];
+const EXPRESSION_SLUGS = ['normal', 'ordering', 'satisfied', 'confused', 'angry'];
 
 function Swatches({ colors, value, onChange }: { colors: string[]; value: string; onChange: (color: string) => void }) {
   return (
@@ -304,6 +371,153 @@ function Pills({ labels, value, onChange }: { labels: string[]; value: number; o
   );
 }
 
+/* ---------- キャラクターの識別パラメータ(表情は含まない)・保存 ---------- */
+
+type CharacterParams = {
+  proportion: (typeof PROPORTION_VALUES)[number];
+  face: number;
+  skin: string;
+  eyes: number;
+  eyeColor: string;
+  mouth: number;
+  hair: number;
+  hairColor: string;
+  top: number;
+  topColor: string;
+  bottom: number;
+  pantsColor: string;
+  shoe: number;
+  shoeColor: string;
+};
+
+type SavedCharacter = {
+  id: string;
+  name: string;
+  createdAt: number;
+  params: CharacterParams;
+};
+
+const SAVED_CHARACTERS_KEY = 'dotCharaGenerator.savedCharacters.v1';
+
+function loadSavedCharacters(): SavedCharacter[] {
+  try {
+    const raw = window.localStorage.getItem(SAVED_CHARACTERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as SavedCharacter[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedCharacters(list: SavedCharacter[]) {
+  try {
+    window.localStorage.setItem(SAVED_CHARACTERS_KEY, JSON.stringify(list));
+  } catch {
+    // localStorageが使えない環境(プライベートモード・容量超過など)では保存を諦める
+  }
+}
+
+/* ---------- 描画本体(プレビュー・PNG書き出しの両方から呼ぶ) ---------- */
+
+function renderCharacter(ctx: CanvasRenderingContext2D, gridH: number, params: CharacterParams & { expression: number }) {
+  const { proportion, face, skin, eyes, eyeColor, mouth, expression, hair, hairColor, top, topColor, bottom, pantsColor, shoe, shoeColor } = params;
+  const neckFn = proportion === 'chibi' ? neckClassChibi : neckClassSlim;
+  const torsoFn = proportion === 'chibi' ? torsoClassChibi : torsoClassSlim;
+  const armFn = proportion === 'chibi' ? armClassChibi : armClassSlim;
+  const legsFn = proportion === 'chibi' ? legsClassChibi : legsClassSlim;
+  const shoeFn = proportion === 'chibi' ? shoeClassChibi : shoeClassSlim;
+
+  const W = GRID_W * CELL, H = gridH * CELL;
+  ctx.clearRect(0, 0, W, H);
+
+  const pixels: (string | null)[][] = Array.from({ length: gridH }, () => new Array(GRID_W).fill(null));
+  const set = (row: number, col: number, color: string) => {
+    if (row >= 0 && row < gridH && col >= 0 && col < GRID_W) pixels[row][col] = color;
+  };
+
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const l = legsFn(row, col, bottom);
+      if (l === 'base') set(row, col, pantsColor);
+      else if (l === 'edge') set(row, col, shade(pantsColor, -0.25));
+      else if (l === 'skin') set(row, col, skin);
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const s = shoeFn(row, col, shoe);
+      if (s === 'base') set(row, col, shoeColor);
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const n = neckFn(row, col);
+      if (n === 'base') set(row, col, skin);
+      else if (n === 'edge') set(row, col, shade(skin, -0.15));
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const t = torsoFn(row, col, top);
+      if (t === 'base') set(row, col, topColor);
+      else if (t === 'edge') set(row, col, shade(topColor, -0.25));
+      else if (t === 'skin') set(row, col, skin);
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const a = armFn(row, col);
+      if (a === 'sleeve') set(row, col, topColor);
+      else if (a === 'skin') set(row, col, skin);
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const f = faceClass(row, col, face);
+      if (f === 'base') set(row, col, isBlush(row, col) ? '#FFB3C6' : skin);
+      else if (f === 'edge') set(row, col, shade(skin, -0.2));
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const e = expression === 0 ? eyeClass(row, col, eyes) : expressionEyeClass(row, col, expression);
+      if (e === 'base') set(row, col, eyeColor);
+      else if (e === 'highlight') set(row, col, '#FFFFFF');
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const b = expressionBrowClass(row, col, expression);
+      if (b === 'base') set(row, col, shade(hairColor, -0.1));
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const m = expression === 0 ? mouthClass(row, col, mouth) : expressionMouthClass(row, col, expression);
+      if (m === 'base') set(row, col, '#8A4A4A');
+      else if (m === 'highlight') set(row, col, '#FFFFFF');
+    }
+  }
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const h = hairClass(row, col, hair);
+      if (h === 'base') set(row, col, hairColor);
+      else if (h === 'edge') set(row, col, shade(hairColor, -0.28));
+    }
+  }
+
+  for (let row = 0; row < gridH; row++) {
+    for (let col = 0; col < GRID_W; col++) {
+      const pixel = pixels[row][col];
+      if (pixel) {
+        ctx.fillStyle = pixel;
+        ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
+      }
+    }
+  }
+}
+
 export default function DotCharacterGenerator() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [proportion, setProportion] = useState<(typeof PROPORTION_VALUES)[number]>('chibi');
@@ -312,6 +526,7 @@ export default function DotCharacterGenerator() {
   const [eyes, setEyes] = useState(0);
   const [eyeColor, setEyeColor] = useState(EYE_COLORS[0]);
   const [mouth, setMouth] = useState(0);
+  const [expression, setExpression] = useState(0);
   const [hair, setHair] = useState(0);
   const [hairColor, setHairColor] = useState(HAIR_COLORS[0]);
   const [top, setTop] = useState(0);
@@ -321,100 +536,25 @@ export default function DotCharacterGenerator() {
   const [shoe, setShoe] = useState(0);
   const [shoeColor, setShoeColor] = useState(SHOE_COLORS[0]);
 
+  const [savedCharacters, setSavedCharacters] = useState<SavedCharacter[]>(() => loadSavedCharacters());
+  const [saveName, setSaveName] = useState('');
+
   const gridH = proportion === 'chibi' ? CHIBI_HEIGHT : SLIM_HEIGHT;
-  const neckFn = proportion === 'chibi' ? neckClassChibi : neckClassSlim;
-  const torsoFn = proportion === 'chibi' ? torsoClassChibi : torsoClassSlim;
-  const armFn = proportion === 'chibi' ? armClassChibi : armClassSlim;
-  const legsFn = proportion === 'chibi' ? legsClassChibi : legsClassSlim;
-  const shoeFn = proportion === 'chibi' ? shoeClassChibi : shoeClassSlim;
+
+  const currentParams = useCallback(
+    (): CharacterParams => ({
+      proportion, face, skin, eyes, eyeColor, mouth, hair, hairColor, top, topColor, bottom, pantsColor, shoe, shoeColor,
+    }),
+    [proportion, face, skin, eyes, eyeColor, mouth, hair, hairColor, top, topColor, bottom, pantsColor, shoe, shoeColor],
+  );
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const W = GRID_W * CELL, H = gridH * CELL;
-    ctx.clearRect(0, 0, W, H);
-
-    const pixels: (string | null)[][] = Array.from({ length: gridH }, () => new Array(GRID_W).fill(null));
-    const set = (row: number, col: number, color: string) => {
-      if (row >= 0 && row < gridH && col >= 0 && col < GRID_W) pixels[row][col] = color;
-    };
-
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const l = legsFn(row, col, bottom);
-        if (l === 'base') set(row, col, pantsColor);
-        else if (l === 'edge') set(row, col, shade(pantsColor, -0.25));
-        else if (l === 'skin') set(row, col, skin);
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const s = shoeFn(row, col, shoe);
-        if (s === 'base') set(row, col, shoeColor);
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const n = neckFn(row, col);
-        if (n === 'base') set(row, col, skin);
-        else if (n === 'edge') set(row, col, shade(skin, -0.15));
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const t = torsoFn(row, col, top);
-        if (t === 'base') set(row, col, topColor);
-        else if (t === 'edge') set(row, col, shade(topColor, -0.25));
-        else if (t === 'skin') set(row, col, skin);
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const a = armFn(row, col);
-        if (a === 'sleeve') set(row, col, topColor);
-        else if (a === 'skin') set(row, col, skin);
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const f = faceClass(row, col, face);
-        if (f === 'base') set(row, col, isBlush(row, col) ? '#FFB3C6' : skin);
-        else if (f === 'edge') set(row, col, shade(skin, -0.2));
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const e = eyeClass(row, col, eyes);
-        if (e === 'base') set(row, col, eyeColor);
-        else if (e === 'highlight') set(row, col, '#FFFFFF');
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const m = mouthClass(row, col, mouth);
-        if (m === 'base') set(row, col, '#8A4A4A');
-      }
-    }
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const h = hairClass(row, col, hair);
-        if (h === 'base') set(row, col, hairColor);
-        else if (h === 'edge') set(row, col, shade(hairColor, -0.28));
-      }
-    }
-
-    for (let row = 0; row < gridH; row++) {
-      for (let col = 0; col < GRID_W; col++) {
-        const pixel = pixels[row][col];
-        if (pixel) {
-          ctx.fillStyle = pixel;
-          ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
-        }
-      }
-    }
-  }, [gridH, neckFn, torsoFn, armFn, legsFn, shoeFn, face, skin, eyes, eyeColor, mouth, hair, hairColor, top, topColor, bottom, pantsColor, shoe, shoeColor]);
+    renderCharacter(ctx, gridH, { ...currentParams(), expression });
+  }, [gridH, currentParams, expression]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -441,6 +581,63 @@ export default function DotCharacterGenerator() {
     link.download = 'dot-character.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
+  };
+
+  const handleDownloadAllExpressions = () => {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = GRID_W * CELL;
+    offscreen.height = gridH * CELL;
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+    const params = currentParams();
+    EXPRESSION_LABELS.forEach((_, i) => {
+      renderCharacter(ctx, gridH, { ...params, expression: i });
+      const link = document.createElement('a');
+      link.download = `dot-character-${EXPRESSION_SLUGS[i]}.png`;
+      link.href = offscreen.toDataURL('image/png');
+      link.click();
+    });
+  };
+
+  const handleSaveCharacter = () => {
+    const name = saveName.trim() || `キャラクター${savedCharacters.length + 1}`;
+    const newCharacter: SavedCharacter = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      createdAt: Date.now(),
+      params: currentParams(),
+    };
+    const next = [...savedCharacters, newCharacter];
+    setSavedCharacters(next);
+    persistSavedCharacters(next);
+    setSaveName('');
+  };
+
+  const handleLoadCharacter = (id: string) => {
+    const target = savedCharacters.find((c) => c.id === id);
+    if (!target) return;
+    const p = target.params;
+    setProportion(p.proportion);
+    setFace(p.face);
+    setSkin(p.skin);
+    setEyes(p.eyes);
+    setEyeColor(p.eyeColor);
+    setMouth(p.mouth);
+    setHair(p.hair);
+    setHairColor(p.hairColor);
+    setTop(p.top);
+    setTopColor(p.topColor);
+    setBottom(p.bottom);
+    setPantsColor(p.pantsColor);
+    setShoe(p.shoe);
+    setShoeColor(p.shoeColor);
+    setExpression(0);
+  };
+
+  const handleDeleteCharacter = (id: string) => {
+    const next = savedCharacters.filter((c) => c.id !== id);
+    setSavedCharacters(next);
+    persistSavedCharacters(next);
   };
 
   return (
@@ -544,12 +741,39 @@ export default function DotCharacterGenerator() {
         }
         .customSwatch input { opacity: 0; position: absolute; inset: 0; cursor: pointer; }
         .proportionSection { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+        .btnGhost {
+          flex: none; width: 100%; background: var(--paper); color: var(--ink);
+          border: 1.5px dashed var(--line); margin-top: 8px;
+        }
+        .saveRow { display: flex; gap: 8px; }
+        .nameInput {
+          flex: 1; min-width: 0; border: 1.5px solid var(--line); border-radius: 10px;
+          padding: 0 12px; font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink);
+        }
+        .nameInput:focus { outline: none; border-color: var(--coral); }
+        .saveBtn { flex: none; padding: 10px 16px; }
+        .savedList { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+        .savedItem {
+          display: flex; align-items: center; gap: 6px;
+          border: 1.5px solid var(--line); border-radius: 10px; padding: 4px 4px 4px 12px;
+        }
+        .savedItemName {
+          flex: 1; text-align: left; background: none; border: none; cursor: pointer;
+          font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--ink); padding: 6px 0;
+        }
+        .savedItemName:hover { color: var(--coral); }
+        .savedItemDelete {
+          flex: none; width: 26px; height: 26px; border-radius: 8px; border: none;
+          background: transparent; color: #9a92b8; cursor: pointer; font-size: 15px; line-height: 1;
+        }
+        .savedItemDelete:hover { background: #fbe4e1; color: var(--coral); }
+        .savedEmpty { margin: 10px 0 0; font-size: 12.5px; color: #9a92b8; }
       `}</style>
 
       <div className="header">
         <p className="eyebrow">Pixel Workshop</p>
         <h1 className="title">ドットキャラクターメーカー</h1>
-        <p className="subtitle">頭身・顔・目・口・髪・トップス・ボトムス・くつを選んで、自分だけのドットキャラを作ろう</p>
+        <p className="subtitle">頭身・顔・目・口・髪・トップス・ボトムス・くつを選んで、自分だけのドットキャラを作ろう。表情の切り替えや、キャラクターの保存・呼び出しにも対応</p>
       </div>
 
       <div className="layout">
@@ -571,6 +795,39 @@ export default function DotCharacterGenerator() {
         </div>
 
         <div className="rail">
+          <div className="section">
+            <div className="sectionHead"><h2 className="sectionTitle">キャラクター保存</h2><span className="sectionHint">SAVE / LOAD</span></div>
+            <div className="saveRow">
+              <input
+                type="text"
+                className="nameInput"
+                placeholder="キャラクター名"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+              />
+              <button type="button" className="btn btnPrimary saveBtn" onClick={handleSaveCharacter}>保存</button>
+            </div>
+            {savedCharacters.length > 0 ? (
+              <ul className="savedList">
+                {savedCharacters.map((c) => (
+                  <li key={c.id} className="savedItem">
+                    <button type="button" className="savedItemName" onClick={() => handleLoadCharacter(c.id)}>{c.name}</button>
+                    <button
+                      type="button"
+                      className="savedItemDelete"
+                      onClick={() => handleDeleteCharacter(c.id)}
+                      aria-label={`${c.name}を削除`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="savedEmpty">まだ保存されたキャラクターはありません</p>
+            )}
+          </div>
+
           <div className="proportionSection">
             <div className="sectionHead"><h2 className="sectionTitle">頭身</h2><span className="sectionHint">PROPORTION</span></div>
             <Pills
@@ -595,6 +852,12 @@ export default function DotCharacterGenerator() {
           <div className="section">
             <div className="sectionHead"><h2 className="sectionTitle">口</h2><span className="sectionHint">MOUTH</span></div>
             <Pills labels={MOUTH_LABELS} value={mouth} onChange={setMouth} />
+          </div>
+
+          <div className="section">
+            <div className="sectionHead"><h2 className="sectionTitle">表情</h2><span className="sectionHint">EXPRESSION</span></div>
+            <Pills labels={EXPRESSION_LABELS} value={expression} onChange={setExpression} />
+            <button type="button" className="btn btnGhost" onClick={handleDownloadAllExpressions}>😊 5表情まとめてPNG保存</button>
           </div>
 
           <div className="section">
